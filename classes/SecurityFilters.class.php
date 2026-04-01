@@ -14,24 +14,24 @@ class SecurityFilters {
     public static function filterContent($content) {
         $codeBlocks = [];
 
-        // Proteger fenced code blocks (``` ... ```)
+        // Protect fenced code blocks (``` ... ```)
         $content = preg_replace_callback('/```[\s\S]*?```/', function($m) use (&$codeBlocks) {
             $placeholder = "\x00CODE" . count($codeBlocks) . "\x00";
             $codeBlocks[$placeholder] = $m[0];
             return $placeholder;
         }, $content);
 
-        // Proteger inline code (` ... `)
+        // Protect inline code (` ... `)
         $content = preg_replace_callback('/`[^`\n]+`/', function($m) use (&$codeBlocks) {
             $placeholder = "\x00CODE" . count($codeBlocks) . "\x00";
             $codeBlocks[$placeholder] = $m[0];
             return $placeholder;
         }, $content);
 
-        // Aplicar filtro KaTeX
+        // Apply KaTeX filter only to content outside code blocks
         $content = self::filterKaTeX($content);
 
-        // Restaurar code blocks
+        // Restore original code blocks
         foreach ($codeBlocks as $placeholder => $original) {
             $content = str_replace($placeholder, $original, $content);
         }
