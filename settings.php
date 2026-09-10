@@ -7,13 +7,6 @@
  *
  */
 
-function sanitizeExtensions(?string $rawInput): array {
-    return array_values(array_diff(array_filter(array_map(
-        fn($v) => strtolower(preg_replace('/[^A-Za-z0-9]/', '', $v)),
-        explode(',', $rawInput ?? '')
-    )),ATTACHMENT_DENIED_EXTENSIONS));
-}
-
 require_once("bootstrap.inc.php");
 // get localization
 $TXT=Localization::getInstance();
@@ -54,8 +47,8 @@ if($g_act=="store"){
   $config.="define('COLOR',\"".$_POST['color']."\");\n";
   $config.="define('DARK',".(isset($_POST['dark'])?"true":"false").");\n";
   $config.="define('GTAG',".($_POST['gtag']?"\"".$_POST['gtag']."\"":"null").");\n";
-  $config.="define('ATTACHMENT_UPLOAD_EXTENSIONS', ".var_export(sanitizeExtensions($_POST['ATTACHMENT_UPLOAD_EXTENSIONS'] ?? null), true).");\n";
-  $config.="define('ATTACHMENT_DISPLAY_EXTENSIONS', ".var_export(sanitizeExtensions($_POST['ATTACHMENT_DISPLAY_EXTENSIONS'] ?? null), true).");\n";
+  $config.="define('ATTACHMENT_UPLOAD_EXTENSIONS', ".var_export(wdf_attachment_extensions_sanitize($_POST['ATTACHMENT_UPLOAD_EXTENSIONS'] ?? null), true).");\n";
+  $config.="define('ATTACHMENT_DISPLAY_EXTENSIONS', ".var_export(wdf_attachment_extensions_sanitize($_POST['ATTACHMENT_DISPLAY_EXTENSIONS'] ?? null), true).");\n";
   // write configuration file
   file_put_contents(BASE."datasets/config.inc.php",$config);
   // alert and redirect
@@ -141,13 +134,21 @@ if($g_act=="store"){
           </div>
         </div>
         <div class="row">
+          <?php /* suggestions only: any extension may be typed, the MIME map is not an allow-list (see helpers/mimetypes/mimetypes.php) */ ?>
+          <datalist id="attachment_extensions_suggestions">
+            <?php foreach(wdf_attachment_extensions_suggested() as $extension): ?>
+              <option value="<?= htmlspecialchars($extension) ?>"></option>
+            <?php endforeach; ?>
+          </datalist>
           <div class="input-field col s12 m5">
-            <input type="text" name="ATTACHMENT_UPLOAD_EXTENSIONS" id="ATTACHMENT_UPLOAD_EXTENSIONS" class="validate" placeholder="<?= $TXT->SettingsATTACHMENT_UPLOAD_EXTENSIONSPlaceholder ?>" value="<?= implode(", ",ATTACHMENT_UPLOAD_EXTENSIONS) ?>">
+            <input type="text" name="ATTACHMENT_UPLOAD_EXTENSIONS" id="ATTACHMENT_UPLOAD_EXTENSIONS" class="validate" list="attachment_extensions_suggestions" placeholder="<?= $TXT->SettingsATTACHMENT_UPLOAD_EXTENSIONSPlaceholder ?>" value="<?= htmlspecialchars(wdf_attachment_extensions_label(ATTACHMENT_UPLOAD_EXTENSIONS)) ?>">
             <label for="ATTACHMENT_UPLOAD_EXTENSIONS"><span class="main-color-text"><?= $TXT->SettingsATTACHMENT_UPLOAD_EXTENSIONS ?></span></label>
+            <span class="helper-text"><?= $TXT->SettingsATTACHMENT_EXTENSIONSHelper ?></span>
           </div>
           <div class="input-field col s12 m7">
-            <input type="text" name="ATTACHMENT_DISPLAY_EXTENSIONS" id="ATTACHMENT_DISPLAY_EXTENSIONS" class="validate" placeholder="<?= $TXT->SettingsATTACHMENT_DISPLAY_EXTENSIONSPlaceholder ?>" value="<?= implode(", ",ATTACHMENT_DISPLAY_EXTENSIONS) ?>">
+            <input type="text" name="ATTACHMENT_DISPLAY_EXTENSIONS" id="ATTACHMENT_DISPLAY_EXTENSIONS" class="validate" list="attachment_extensions_suggestions" placeholder="<?= $TXT->SettingsATTACHMENT_DISPLAY_EXTENSIONSPlaceholder ?>" value="<?= htmlspecialchars(wdf_attachment_extensions_label(ATTACHMENT_DISPLAY_EXTENSIONS)) ?>">
             <label for="ATTACHMENT_DISPLAY_EXTENSIONS"><span class="main-color-text"><?= $TXT->SettingsATTACHMENT_DISPLAY_EXTENSIONS ?></span></label>
+            <span class="helper-text"><?= $TXT->SettingsATTACHMENT_EXTENSIONSHelper ?></span>
           </div>
         </div>
         <div class="row">

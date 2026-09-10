@@ -112,6 +112,36 @@ location / {
 
 You can customize the default template by creating the file `styles/styles-custom.css`.
 
+Attachment uploads are checked against the extension to MIME type map in
+`helpers/mimetypes/mimetypes.php`. To support an extension that is not covered
+there, copy `helpers/mimetypes/sample.mimetypes-custom.php` to
+`helpers/mimetypes/mimetypes-custom.php` and add it, for example
+`"midi" => "audio/midi",`. Entries in the custom file are merged on top of the
+defaults and are not overwritten by an upgrade, so the shipped map never needs
+to be edited.
+
+The extensions in the map are offered as suggestions on the attachment settings
+in `settings.php`. They are only suggestions: the MIME map describes the content
+types that are plausible for an extension, so an extension missing from it can
+still be typed in and allowed.
+
+Both attachment settings, *Extensions allowed for uploading attachments* and
+*Extensions allowed for viewing attachments*, have three states:
+
+| Value | Meaning |
+| --- | --- |
+| empty | nothing is allowed: no attachment can be uploaded, none is listed |
+| `pdf, txt, ...` | only the listed extensions are allowed |
+| `*` | every extension is allowed |
+
+Extensions in `ATTACHMENT_DENIED_EXTENSIONS` (`php`, `phar`, `sh`, ...) are
+always refused, including when `*` is configured.
+
+When the viewing extensions hide attachments that are stored in a document,
+authenticated editors are shown a warning with the number of hidden files, both
+on the document and in the attachments dialog, so a document is never assumed to
+be empty while attachments are still on disk.
+
 
 
 ## Developers

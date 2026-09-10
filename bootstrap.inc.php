@@ -38,9 +38,13 @@ if(!file_exists(realpath(dirname(__FILE__))."/datasets/config.inc.php")){header(
 // include configuration file
 require_once("datasets/config.inc.php");
 
-// attachment extensions (empty array = no restriction)
-if(!defined("ATTACHMENT_UPLOAD_EXTENSIONS")){define("ATTACHMENT_UPLOAD_EXTENSIONS",array());}
-if(!defined("ATTACHMENT_DISPLAY_EXTENSIONS")){define("ATTACHMENT_DISPLAY_EXTENSIONS",array());}
+// attachment extensions wildcard, a list holding it allows every extension
+if(!defined("ATTACHMENT_EXTENSIONS_WILDCARD")){define("ATTACHMENT_EXTENSIONS_WILDCARD","*");}
+
+// attachment extensions (empty array = nothing allowed, array("*") = everything allowed)
+// configurations written before these settings existed keep their previous unrestricted behaviour
+if(!defined("ATTACHMENT_UPLOAD_EXTENSIONS")){define("ATTACHMENT_UPLOAD_EXTENSIONS",array(ATTACHMENT_EXTENSIONS_WILDCARD));}
+if(!defined("ATTACHMENT_DISPLAY_EXTENSIONS")){define("ATTACHMENT_DISPLAY_EXTENSIONS",array(ATTACHMENT_EXTENSIONS_WILDCARD));}
 
 // extensions that can never be allowed, regardless of configuration
 if(!defined("ATTACHMENT_DENIED_EXTENSIONS")){

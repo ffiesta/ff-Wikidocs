@@ -260,18 +260,19 @@
               <form id="attachments-uploader-form" method="post" action="<?= $APP->PATH ?>submit.php?act=attachment_upload_ajax" enctype="multipart/form-data">
                 <input type="hidden" name="token" value="<?= Session::getInstance()->token() ?>">
                 <input type="hidden" name="document" value="<?= $DOC->ID ?>">
+                <?php $uploads_enabled=count(ATTACHMENT_UPLOAD_EXTENSIONS); ?>
                 <div class="row" style="margin-top:36px">
                   <div class="input-field file-field col s9">
-                    <div class="btn waves-effect waves-light main-color">
+                    <div class="btn waves-effect waves-light main-color<?= $uploads_enabled?"":" disabled" ?>">
                       <span><?= $TXT->AttachmentsBrowse ?></span>
-                      <input type="file" name="attachment" required>
+                      <input type="file" name="attachment" required<?= $uploads_enabled?"":" disabled" ?>>
                     </div><!-- /btn -->
                     <div class="file-path-wrapper">
-                      <input type="text" id="uploader-path" class="file-path validate" placeholder="<?= $TXT->AttachmentsSelect ?>... <?= count(ATTACHMENT_UPLOAD_EXTENSIONS)?" (".implode(", ",ATTACHMENT_UPLOAD_EXTENSIONS).")":"" ?>">
+                      <input type="text" id="uploader-path" class="file-path validate" placeholder="<?= $TXT->AttachmentsSelect ?>...<?= wdf_attachment_extensions_all(ATTACHMENT_UPLOAD_EXTENSIONS)?"":($uploads_enabled?" (".implode(", ",ATTACHMENT_UPLOAD_EXTENSIONS).")":" (".$TXT->AttachmentsUploadDisabled.")") ?>"<?= $uploads_enabled?"":" disabled" ?>>
                     </div><!-- /file-path-wrapper -->
                   </div><!-- /input-field -->
                   <div class="input-field col s3">
-                    <input id="uploader-submit" type="submit" class="btn main-color right" value="<?= $TXT->AttachmentsSubmit ?>">
+                    <input id="uploader-submit" type="submit" class="btn main-color right<?= $uploads_enabled?"":" disabled" ?>" value="<?= $TXT->AttachmentsSubmit ?>"<?= $uploads_enabled?"":" disabled" ?>>
                   </div><!-- /input-field -->
                 </div><!-- /row -->
               </form>
@@ -280,6 +281,12 @@
                   <li>- <?= $attachment->label ?> &nbsp; <a href="#" class="attachment-delete tooltipped" attachment="<?= $attachment->label ?>" data-position="top" data-tooltip="<?= $TXT->AttachmentsDelete ?>"><span class="fa fa-trash-o" aria-hidden="true"></span></a></li>
                 <?php endforeach; ?>
               </ul><!-- /row -->
+              <?php if($DOC->ATTACHMENTS_HIDDEN): ?>
+                <div class="row" id="attachments-hidden">
+                  <i class="material-icons orange-text" style="vertical-align:middle">warning</i>
+                  <small><?= str_replace("{count}",$DOC->ATTACHMENTS_HIDDEN,$TXT->AttachmentsHidden) ?></small>
+                </div>
+              <?php endif; ?>
               <div class="row" id="attachments-info">
                 <i><small>* <?= $TXT->FilesDeleteInfoText ?></small></i>
               </div>
