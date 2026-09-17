@@ -42,6 +42,7 @@ final class Document{
     protected string $VERSION;
     protected ?string $FILE;
     protected ?int $TIMESTAMP;
+    protected int $ATTACHMENTS_HIDDEN;
 
     /**
      * Constructor
@@ -55,9 +56,11 @@ final class Document{
         $this->URL=URL.$this->ID;
         $this->DIR=ROOT.$this->PATH."/";
         $this->TITLE=self::getTitle($this->ID);
-        $this->VERSION=(strlen($_GET['version']??'')?$_GET['version']:"latest");
+        // sanitize version so it cannot traverse out of the versions directory
+        $this->VERSION=(strlen($_GET['version']??'')?wdf_safe_filename($_GET['version']):"latest");
         $this->FILE=$this->DIR."content.md";
         $this->TIMESTAMP=null;
+        $this->ATTACHMENTS_HIDDEN=0;
         // check if file exist
         if(!file_exists($this->FILE)){$this->FILE=null;}
         if(file_exists($this->FILE ?? '')){$this->TIMESTAMP=filemtime($this->FILE);}
@@ -254,10 +257,16 @@ final class Document{
      */
     private static function sanitizeIframes($part) {
         $allowedHosts = self::allowedIframeHosts();
+        // The attribute chunk tokenizes quoted values so a value that itself
+        // contains ">" (e.g. srcdoc="<img ...>") does not truncate the match,
+        // and the closing </iframe> is optional so an UNCLOSED <iframe ...>
+        // is still caught and escaped. Without this an unclosed srcdoc iframe
+        // slipped through to Parsedown, which re-emitted it as a live element
+        // and re-decoded the srcdoc payload (stored XSS).
         return preg_replace_callback(
-            '#<iframe\b([^>]*?)(?:/\s*>|>\s*(.*?)</iframe\s*>)#is',
+            '#<iframe\b((?:"[^"]*"|\'[^\']*\'|[^>"\'])*)>(?:\s*(.*?)</iframe\s*>)?#is',
             function($m) use ($allowedHosts) {
-                $attrs = $m[1];
+                $attrs = rtrim($m[1], '/');
                 $inner = isset($m[2]) ? $m[2] : '';
                 // extract src
                 if (!preg_match('/\bsrc\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $sm)) {
@@ -353,12 +362,18 @@ final class Document{
         if($content!=false){$source=$content;}else{$source="# ".$this->TITLE."\n";}
         // check for attachments
         $attachments_array=$this->attachments();
-        if(count($attachments_array)){
+        // warn editors about the attachments the display extensions are hiding
+        $attachments_hidden=($this->ATTACHMENTS_HIDDEN && Session::getInstance()->autenticationLevel()==2);
+        if(count($attachments_array) || $attachments_hidden){
             // build attachments index
             $source.="\n\n___\n";
             // cycle all attachments
             foreach($attachments_array as $attachment_fe){
                 $source.="- [".$attachment_fe->label."](".$attachment_fe->url.")\n";
+            }
+            // add the hidden attachments notice
+            if($attachments_hidden){
+                $source.="\n> [!WARNING] ".str_replace("{count}",$this->ATTACHMENTS_HIDDEN,Localization::getInstance()->AttachmentsHidden)."\n";
             }
         }
         // search for sub-documents
@@ -428,9 +443,10 @@ final class Document{
             foreach($elements as $element_fe){
                 // skip directories
                 if(is_dir($this->DIR."/".$element_fe)){continue;}
-                $file_extension=explode(".",$element_fe);
+                $file_extension_array=explode(".",$element_fe);
+                $file_extension=strtolower(end($file_extension_array));
                 // check extensions
-                if(!in_array(end($file_extension),array("png","gif","jpg","jpeg","svg"))){continue;}
+                if(!in_array($file_extension,array("png","gif","jpg","jpeg","svg"))){continue;}
                 // add element to documents array
                 $images_array[]=$element_fe;
             }
@@ -449,6 +465,9 @@ final class Document{
     public function attachments():array{
         // definition
         $attachments_array=array();
+        $this->ATTACHMENTS_HIDDEN=0;
+        // extensions allowed in the current mode
+        $extensions=(MODE=='edit'?ATTACHMENT_UPLOAD_EXTENSIONS:ATTACHMENT_DISPLAY_EXTENSIONS);
         // check directory
         if(is_dir($this->DIR)){
             // scan directory for documents
@@ -457,9 +476,16 @@ final class Document{
             foreach($elements as $element_fe){
                 // skip directories
                 if(is_dir($this->DIR."/".$element_fe)){continue;}
-                $file_extension=explode(".",$element_fe);
-                // check extensions
-                if(!in_array(end($file_extension),array("pdf","txt","doc","docx","xls","xlsx","ppt","pptx"))){continue;}
+                // skip the document content
+                if($element_fe==="content.md"){continue;}
+                $file_extension_array=explode(".",$element_fe);
+                $file_extension=strtolower(end($file_extension_array));
+                // check extensions, counting the files the settings are hiding
+                if(!wdf_attachment_extension_allowed($file_extension,$extensions)){
+                    // images have their own uploader, they are not reported as hidden attachments
+                    if(!in_array($file_extension,array("png","gif","jpg","jpeg","svg"),true)){$this->ATTACHMENTS_HIDDEN++;}
+                    continue;
+                }
                 // make element
                 $attachment=new stdClass();
                 $attachment->label=$element_fe;

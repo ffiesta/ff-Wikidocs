@@ -40,8 +40,6 @@ function authentication(){
   // get localization
   $TXT=Localization::getInstance();
   wdf_dump($_REQUEST,"_REQUEST");
-  // reset authentication
-  $_SESSION['wikidocs']['authenticated']=0;
   // acquire variables
   $p_document=strtolower($_POST['document']);
   $p_password=$_POST['password'];
@@ -60,6 +58,13 @@ function authentication(){
   // check for authentication
   if($_SESSION['wikidocs']['authenticated']) {
     wdf_alert($TXT->SubmitAuthSuccess,"success");
+    $latestVersion=wdf_pulse_latest_version(true);
+    if($latestVersion!==null && $latestVersion!==trim(VERSION)){
+      wdf_alert(sprintf($TXT->PulseUpdateAvailable,$latestVersion),"info");
+      if(preg_match('/^2(?:\.|$)/',$latestVersion)){
+        wdf_alert($TXT->PulseMajorUpdateAvailable,"warning");
+      }
+    }
     wdf_redirect(PATH.$p_document);
   }else{
     wdf_alert($TXT->SubmitAuthInvalid,"danger");
@@ -115,7 +120,6 @@ function content_save(){
     wdf_regenerate_sitemap();
     // redirect
     wdf_redirect(PATH.$p_document);
-    return;
   }
   // file path is ok.
   // check for directory or make it
@@ -132,11 +136,11 @@ function content_save(){
   // document path definition
   define("DOC_PATH",$DOC->PATH."/");
   // replace url in images
-  $p_content=preg_replace_callback('/!\[(.*)\]\s?\((.*)(.png|.gif|.jpg|.jpeg|.svg)(.*)\)/',function($match){return str_replace(DOC_PATH,"{{DOC_PATH}}",$match[0]);},$p_content);
+  $p_content=preg_replace_callback('/!\[(.*)]\s?\((.*)(.png|.gif|.jpg|.jpeg|.svg)(.*)\)/',function($match){return str_replace(DOC_PATH,"{{DOC_PATH}}",$match[0]);},$p_content);
   // replace url in images
-  $p_content=preg_replace_callback('/\[(.*)\]:\s?(.*)(.png|.gif|.jpg|.jpeg|.svg|)/',function($match){return str_replace(DOC_PATH,"{{DOC_PATH}}",$match[0]);},$p_content);
+  $p_content=preg_replace_callback('/\[(.*)]:\s?(.*)(.png|.gif|.jpg|.jpeg|.svg|)/',function($match){return str_replace(DOC_PATH,"{{DOC_PATH}}",$match[0]);},$p_content);
   // replace path in url
-  $p_content=preg_replace_callback('/\[(.*)\]\s?\((.*)\)/',function($match){return str_replace("(".PATH,"({{APP_PATH}}",$match[0]);},$p_content);
+  $p_content=preg_replace_callback('/\[(.*)]\s?\((.*)\)/',function($match){return str_replace("(".PATH,"({{APP_PATH}}",$match[0]);},$p_content);
   wdf_dump($p_content,"content");
   // save content file
   $bytes=file_put_contents($DOC->DIR."content.md",$p_content);
@@ -320,7 +324,7 @@ function image_upload_ajax(){
     return false;
   }
   // make file name
-  $file_name=strtolower(str_replace(" ","-",$image['name']));
+  $file_name=strtolower(str_replace(" ","-",wdf_safe_filename($image['name'])));
   // check for posted image
   if(isset($image['tmp_name']) && $image['tmp_name']){
     // sanitization for SVG
@@ -380,7 +384,7 @@ function image_drop_upload_ajax() {
     return false;
   }
   $image_base64 = $_POST['image_base64'];
-  $image_filename = $_POST['image_name'];
+  $image_filename = wdf_safe_filename($_POST['image_name']);
   if(Session::getInstance()->autenticationLevel()!=2){
     echo json_encode(array("error"=>1,"code"=>"not_authenticated"));
     return false;
@@ -466,7 +470,7 @@ function image_delete_ajax() {
     echo json_encode(array("error"=>1,"code"=>"csrf_error"));
     return false;
   }
-  $image_filename = basename($_POST['image_name']); // added basename()
+  $image_filename = wdf_safe_filename($_POST['image_name']);
   if(Session::getInstance()->autenticationLevel() != 2) {
     echo json_encode(array("error" => 1, "code" => "not_authenticated"));
     return false;
@@ -531,31 +535,23 @@ function attachment_upload_ajax(){
   // make attachment
   $attachment=$_FILES['attachment'];
   $attachment['ext']=strtolower(pathinfo($_FILES['attachment']['name'],PATHINFO_EXTENSION));
-  // check extension
-  if(!in_array($attachment['ext'],array("pdf","doc","docx","xls","xlsx","ppt","pptx"))){
+  // check extension against the configured upload extensions
+  if(!wdf_attachment_extension_allowed($attachment['ext'],ATTACHMENT_UPLOAD_EXTENSIONS)){
     echo json_encode(array("error"=>1,"code"=>"extension_not_allowed","file"=>$attachment));
     return false;
   }
-  // check file type
-  if(!in_array($attachment["type"],array(
-    "application/pdf",
-    "application/msword",
-    "application/vnd.ms-excel",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-  ))){
+  // check file type (see helpers/mimetypes/mimetypes.php)
+  if(!wdf_mimetype_allowed($attachment['ext'],$attachment["type"] ?? null)){
     echo json_encode(array("error"=>1,"code"=>"file_not_allowed","file"=>$attachment));
     return false;
   }
-  // check file size (limit to 10 MB)
+  // check file size (limit to 256 MB)
   if($attachment['size'] > 256 * 1024 * 1024) {
     echo json_encode(array("error"=>1,"code"=>"file_too_large","size"=>$attachment['size']));
     return false;
   }
   // make file name
-  $file_name=strtolower(str_replace(" ","-",$attachment['name']));
+  $file_name=strtolower(str_replace(" ","-",wdf_safe_filename($attachment['name'])));
   // move temporary file
   $uploaded=move_uploaded_file($attachment['tmp_name'],$DOC->DIR.$file_name);
   // check for uploaded
@@ -583,7 +579,7 @@ function attachment_delete_ajax() {
     echo json_encode(array("error"=>1,"code"=>"csrf_error"));
     return false;
   }
-  $attachment_filename = $_POST['attachment_name'];
+  $attachment_filename = wdf_safe_filename($_POST['attachment_name']);
   if(Session::getInstance()->autenticationLevel() != 2) {
     echo json_encode(array("error" => 1, "code" => "not_authenticated"));
     return false;

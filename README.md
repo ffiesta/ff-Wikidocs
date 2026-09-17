@@ -1,7 +1,3 @@
-> Checkout the new **Version 2** beta!
->
-> https://github.com/Zavy86/WikiDocs/tree/v2
-
 # Wiki|Docs
 
 Just a databaseless markdown flat-file wiki engine.
@@ -9,8 +5,6 @@ Just a databaseless markdown flat-file wiki engine.
 Project homepage: [https://www.wikidocs.app](https://www.wikidocs.app)
 
 _Please consider supporting this project by making a donation via [PayPal](https://www.paypal.me/zavy86)_
-
-[![Wiki|Docs presentation and contributors recruitment on YouTube](https://www.wikidocs.app/datasets/documents/homepage/cover-side-project-wikidocs-youtube.jpg)](https://youtu.be/x2nVq9RbG54 "Watch Wiki|Docs presentation and contributors recruitment on YouTube")
 
 ## Features
 - Open source
@@ -118,6 +112,36 @@ location / {
 
 You can customize the default template by creating the file `styles/styles-custom.css`.
 
+Attachment uploads are checked against the extension to MIME type map in
+`helpers/mimetypes/mimetypes.php`. To support an extension that is not covered
+there, copy `helpers/mimetypes/sample.mimetypes-custom.php` to
+`helpers/mimetypes/mimetypes-custom.php` and add it, for example
+`"midi" => "audio/midi",`. Entries in the custom file are merged on top of the
+defaults and are not overwritten by an upgrade, so the shipped map never needs
+to be edited.
+
+The extensions in the map are offered as suggestions on the attachment settings
+in `settings.php`. They are only suggestions: the MIME map describes the content
+types that are plausible for an extension, so an extension missing from it can
+still be typed in and allowed.
+
+Both attachment settings, *Extensions allowed for uploading attachments* and
+*Extensions allowed for viewing attachments*, have three states:
+
+| Value | Meaning |
+| --- | --- |
+| empty | nothing is allowed: no attachment can be uploaded, none is listed |
+| `pdf, txt, ...` | only the listed extensions are allowed |
+| `*` | every extension is allowed |
+
+Extensions in `ATTACHMENT_DENIED_EXTENSIONS` (`php`, `phar`, `sh`, ...) are
+always refused, including when `*` is configured.
+
+When the viewing extensions hide attachments that are stored in a document,
+authenticated editors are shown a warning with the number of hidden files, both
+on the document and in the attachments dialog, so a document is never assumed to
+be empty while attachments are still on disk.
+
 
 
 ## Developers
@@ -148,6 +172,7 @@ You can customize the default template by creating the file `styles/styles-custo
 - [Petr Husák](https://github.com/petrhusak)
 - [Oliver Lehmann](https://github.com/OlliL)
 - [Prabal Khare](https://github.com/00PrabalK00)
+- [Roberto Bellingeri](https://github.com/bellingeri)
 
 ## License
 Code released under the MIT License
